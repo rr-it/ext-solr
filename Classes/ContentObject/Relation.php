@@ -316,6 +316,14 @@ class Relation extends AbstractContentObject
 
         $values = [$relatedRecord[$foreignTableLabelField]];
 
+        // set custom foreign_table configuration
+        if (!empty($this->configuration['foreignTable'])
+            && isset($foreignTableTca['columns'][$foreignTableLabelField])
+            && !isset($foreignTableTca['columns'][$foreignTableLabelField]['config']['foreign_table'])) {
+            $foreignTableTca['columns'][$foreignTableLabelField]['config'] = $foreignTableTca['columns'][$foreignTableLabelField]['config'] ?? [];
+            $foreignTableTca['columns'][$foreignTableLabelField]['config']['foreign_table'] = trim($this->configuration['foreignTable']);
+        }
+
         if (
             !empty($foreignTableName)
             && isset($foreignTableTca['columns'][$foreignTableLabelField]['config']['foreign_table'])
@@ -334,6 +342,12 @@ class Relation extends AbstractContentObject
                     $this->configuration['foreignLabelField'], 2);
             } else {
                 $this->configuration['foreignLabelField'] = '';
+            }
+            if (!empty($this->configuration['foreignTable']) && strpos($this->configuration['foreignTable'], '.') !== false) {
+                list(, $this->configuration['foreignTable']) = explode('.',
+                    $this->configuration['foreignTable'], 2);
+            } else {
+                $this->configuration['foreignTable'] = '';
             }
 
             // recursion
@@ -372,6 +386,9 @@ class Relation extends AbstractContentObject
             ->where($queryBuilder->expr()->in('uid', $uids));
         if (isset($this->configuration['additionalWhereClause'])) {
             $queryBuilder->andWhere($this->configuration['additionalWhereClause']);
+        }
+        if (isset($this->configuration['additionalWhereClause.'][$foreignTable])) {
+            $queryBuilder->andWhere($this->configuration['additionalWhereClause.'][$foreignTable]);
         }
         $statement = $queryBuilder->execute();
 
