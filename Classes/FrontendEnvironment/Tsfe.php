@@ -1,30 +1,31 @@
 <?php
+
 namespace ApacheSolrForTypo3\Solr\FrontendEnvironment;
 
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
 use TYPO3\CMS\Core\Context\LanguageAspectFactory;
 use TYPO3\CMS\Core\Context\TypoScriptAspect;
+use TYPO3\CMS\Core\Context\UserAspect;
+use TYPO3\CMS\Core\Context\VisibilityAspect;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Error\Http\InternalServerErrorException;
 use TYPO3\CMS\Core\Error\Http\ServiceUnavailableException;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Http\ImmediateResponseException;
+use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\TypoScript\TemplateService;
-use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
-use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Frontend\Page\PageRepository;
-use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
-use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
+use TYPO3\CMS\Frontend\Page\PageRepository;
 
 class Tsfe implements SingletonInterface
 {
-
     private $tsfeCache = [];
 
     private $requestCache = [];
@@ -53,7 +54,6 @@ class Tsfe implements SingletonInterface
             $languageAspect = LanguageAspectFactory::createFromSiteLanguage($site->getLanguageById($language));
             $context->setAspect('language', $languageAspect);
         } catch (SiteNotFoundException $e) {
-
         }
     }
 
@@ -96,8 +96,21 @@ class Tsfe implements SingletonInterface
         }
         $GLOBALS['TYPO3_REQUEST'] = $this->requestCache[$cacheId];
 
-
         if (!isset($this->tsfeCache[$cacheId])) {
+            // TYPO3 by default enables a preview mode if a backend user is logged in,
+            // the VisibilityAspect is configured to show hidden elements.
+            // Due to this setting hidden relations/translations might be indexed
+            // when running the Solr indexer via the TYPO3 backend.
+            // To avoid this, the VisibilityAspect is adapted for indexing.
+            $context->setAspect(
+                'visibility',
+                GeneralUtility::makeInstance(
+                    VisibilityAspect::class,
+                    false,
+                    false
+                )
+            );
+
             $feUser = GeneralUtility::makeInstance(FrontendUserAuthentication::class);
 
             /* @var TypoScriptFrontendController $globalsTSFE */
